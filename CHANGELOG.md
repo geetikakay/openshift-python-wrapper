@@ -1,6 +1,20 @@
 # Changelog
 
+## v1.5.19 (29/08/2021)
+- [**Verified**][**size/XS**][**Approve**] Adjust ApiGroup for SM Resources [#126](https://github.com/RedHatQE/openshift-python-wrapper/pull/126)
+- [**Verified**][**size/XS**][**Approve**] Add vm status [#124](https://github.com/RedHatQE/openshift-python-wrapper/pull/124)
+- [**Verified**][**size/XS**][**Approve**] fix inheritence for resources [#121](https://github.com/RedHatQE/openshift-python-wrapper/pull/121)
+- [**Verified**][**size/XS**][**Approve**] Adjust apiGroup and apiVersion for Gateway resource. [#122](https://github.com/RedHatQE/openshift-python-wrapper/pull/122)
+
+---
+
 ## v1.5.18 (24/08/2021)
+- [**size/XS**] Revert "Add VirtualService resource for Service Mesh usage." [#119](https://github.com/RedHatQE/openshift-python-wrapper/pull/119)
+- [**Verified**][**size/L**][**Approve**] add machineset resource implementation [#97](https://github.com/RedHatQE/openshift-python-wrapper/pull/97)
+
+---
+
+## v1.5.18 (01/01/1970)
 - [**size/XS**] Revert "Add VirtualService resource for Service Mesh usage." [#119](https://github.com/RedHatQE/openshift-python-wrapper/pull/119)
 - [**Verified**][**size/L**][**Approve**] add machineset resource implementation [#97](https://github.com/RedHatQE/openshift-python-wrapper/pull/97)
 
