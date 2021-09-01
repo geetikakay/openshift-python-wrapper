@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.5.26 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.25 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.24 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.23 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.22 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.21 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.20 (01/09/2021)
+- [**Verified**][**size/XS**][**Approve**] Add Vm printable status property [#128](https://github.com/RedHatQE/openshift-python-wrapper/pull/128)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] resource.delete: accept body [#131](https://github.com/RedHatQE/openshift-python-wrapper/pull/131)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add missing raise in create() [#132](https://github.com/RedHatQE/openshift-python-wrapper/pull/132)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add Service Mesh Peer Authentication Resource [#129](https://github.com/RedHatQE/openshift-python-wrapper/pull/129)
+
+---
+
+## v1.5.19 (29/08/2021)
+- [**Verified**][**size/XS**][**Approve**] Adjust ApiGroup for SM Resources [#126](https://github.com/RedHatQE/openshift-python-wrapper/pull/126)
+- [**Verified**][**size/XS**][**Approve**] Add vm status [#124](https://github.com/RedHatQE/openshift-python-wrapper/pull/124)
+- [**Verified**][**size/XS**][**Approve**] fix inheritence for resources [#121](https://github.com/RedHatQE/openshift-python-wrapper/pull/121)
+- [**Verified**][**size/XS**][**Approve**] Adjust apiGroup and apiVersion for Gateway resource. [#122](https://github.com/RedHatQE/openshift-python-wrapper/pull/122)
+
+---
+
 ## v1.5.18 (24/08/2021)
 - [**size/XS**] Revert "Add VirtualService resource for Service Mesh usage." [#119](https://github.com/RedHatQE/openshift-python-wrapper/pull/119)
 - [**Verified**][**size/L**][**Approve**] add machineset resource implementation [#97](https://github.com/RedHatQE/openshift-python-wrapper/pull/97)
