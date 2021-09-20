@@ -1,5 +1,113 @@
 # Changelog
 
+## v2.0.6 (20/09/2021)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] namespae resource: support get raw object in get() [#185](https://github.com/RedHatQE/openshift-python-wrapper/pull/185)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] test_resources_definitions: Add exclude resource [#181](https://github.com/RedHatQE/openshift-python-wrapper/pull/181)
+
+---
+
+## v2.0.5 (16/09/2021)
+- [**size/XXL**] sphinx-docs [#183](https://github.com/RedHatQE/openshift-python-wrapper/pull/183)
+
+---
+
+## v2.0.4 (15/09/2021)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] Add ConflictError to DEFAULT_CLUSTER_RETRY_EXCEPTIONS [#147](https://github.com/RedHatQE/openshift-python-wrapper/pull/147)
+
+---
+
+## v2.0.3 (12/09/2021)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] TimeoutSampler: improve print for lambda calls [#178](https://github.com/RedHatQE/openshift-python-wrapper/pull/178)
+- [**Verified**][**size/L**][**Approve**] Validate resources [#172](https://github.com/RedHatQE/openshift-python-wrapper/pull/172)
+- [**Verified**][**size/XS**][**Approve**] Fix validate-resources errors [#176](https://github.com/RedHatQE/openshift-python-wrapper/pull/176)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Service Mesh Control Plane [#170](https://github.com/RedHatQE/openshift-python-wrapper/pull/170)
+
+---
+
+## v2.0.2 (09/09/2021)
+- [**Verified**][**size/XS**][**Approve**] Resource.labels does not return a dict, returns a ResourceField [#175](https://github.com/RedHatQE/openshift-python-wrapper/pull/175)
+- [**Verified**][**size/M**][**Approve**][**Ready for merge**] host resource [#168](https://github.com/RedHatQE/openshift-python-wrapper/pull/168)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] TimeoutSampler: Print func and func kwargs before start loop [#154](https://github.com/RedHatQE/openshift-python-wrapper/pull/154)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Remove unneeded packages from setup.py [#151](https://github.com/RedHatQE/openshift-python-wrapper/pull/151)
+- [**size/XS**] test-issure-from-pr-action [#166](https://github.com/RedHatQE/openshift-python-wrapper/pull/166)
+- [**Verified**][**size/XS**][**Approve**] Test action 1 [#164](https://github.com/RedHatQE/openshift-python-wrapper/pull/164)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add hostname property to Node [#149](https://github.com/RedHatQE/openshift-python-wrapper/pull/149)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] dv.wait - raise TimeoutExpiredError if DV's status is Pending [#140](https://github.com/RedHatQE/openshift-python-wrapper/pull/140)
+
+---
+
+## v2.0.1 (02/09/2021)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] ResourceEditor: ResourceField sanitizing [#118](https://github.com/RedHatQE/openshift-python-wrapper/pull/118)
+
+---
+
+## v2.0.0 (01/09/2021)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Node: No need to import NamespacedResource [#143](https://github.com/RedHatQE/openshift-python-wrapper/pull/143)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] Convert self.api() to property [#133](https://github.com/RedHatQE/openshift-python-wrapper/pull/133)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] pre-commit: add more checks [#134](https://github.com/RedHatQE/openshift-python-wrapper/pull/134)
+
+---
+
+## v1.5.29 (01/09/2021)
+
+---
+
+## v1.5.28 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.27 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.26 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.25 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.24 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.23 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.22 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.21 (01/09/2021)
+*No changelog for this release.*
+
+---
+
+## v1.5.20 (01/09/2021)
+- [**Verified**][**size/XS**][**Approve**] Add Vm printable status property [#128](https://github.com/RedHatQE/openshift-python-wrapper/pull/128)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] resource.delete: accept body [#131](https://github.com/RedHatQE/openshift-python-wrapper/pull/131)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add missing raise in create() [#132](https://github.com/RedHatQE/openshift-python-wrapper/pull/132)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add Service Mesh Peer Authentication Resource [#129](https://github.com/RedHatQE/openshift-python-wrapper/pull/129)
+
+---
+
+## v1.5.19 (29/08/2021)
+- [**Verified**][**size/XS**][**Approve**] Adjust ApiGroup for SM Resources [#126](https://github.com/RedHatQE/openshift-python-wrapper/pull/126)
+- [**Verified**][**size/XS**][**Approve**] Add vm status [#124](https://github.com/RedHatQE/openshift-python-wrapper/pull/124)
+- [**Verified**][**size/XS**][**Approve**] fix inheritence for resources [#121](https://github.com/RedHatQE/openshift-python-wrapper/pull/121)
+- [**Verified**][**size/XS**][**Approve**] Adjust apiGroup and apiVersion for Gateway resource. [#122](https://github.com/RedHatQE/openshift-python-wrapper/pull/122)
+
+---
+
 ## v1.5.18 (24/08/2021)
 - [**size/XS**] Revert "Add VirtualService resource for Service Mesh usage." [#119](https://github.com/RedHatQE/openshift-python-wrapper/pull/119)
 - [**Verified**][**size/L**][**Approve**] add machineset resource implementation [#97](https://github.com/RedHatQE/openshift-python-wrapper/pull/97)
@@ -63,48 +171,3 @@
 
 ## v1.5.8 (02/08/2021)
 *No changelog for this release.*
-
----
-
-## v1.5.7 (02/08/2021)
-*No changelog for this release.*
-
----
-
-## v1.5.6 (02/08/2021)
-*No changelog for this release.*
-
----
-
-## v1.5.4 (02/08/2021)
-- [**closed**] Remove nudge_delete workaround [#75](https://github.com/RedHatQE/openshift-python-wrapper/issues/75)
-- [**enhancement**] Resource from YAML file [#71](https://github.com/RedHatQE/openshift-python-wrapper/issues/71)
-
----
-
-## v1.5.3 (26/07/2021)
-*No changelog for this release.*
-
----
-
-## v1.5.2 (14/07/2021)
-
----
-
-## v1.5.1 (14/07/2021)
-
----
-
-## test github action > push to pypi (05/07/2021)
-
----
-
-## test github action > push to pypi (05/07/2021)
-
----
-
-## test github action > push to pypi (05/07/2021)
-
----
-
-## First release (04/07/2021)
