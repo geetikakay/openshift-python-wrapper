@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.1 (25/11/2021)
+- [**Verified**][**size/S**][**Approve**][**Ready for merge**] Add data source [#253](https://github.com/RedHatQE/openshift-python-wrapper/pull/253)
+
+---
+
+## v1.5.3.55 (18/11/2021)
+- [**Verified**][**Approve**][**Ready for merge**] namespace resource: support get raw object in get() - Cherry-pick [#242](https://github.com/RedHatQE/openshift-python-wrapper/pull/242)
+- [**Verified**][**size/XS**][**Approve**][**Ready for merge**] Add kind to log api version in _get_api_version [#243](https://github.com/RedHatQE/openshift-python-wrapper/pull/243)
+
+---
+
 ## v2.1.0 (11/11/2021)
 - [**Verified**][**size/M**][**Approve**] Added support for hooks in the plan [#238](https://github.com/RedHatQE/openshift-python-wrapper/pull/238)
 - [**Verified**][**size/XS**][**Approve**] Set  MAX_SUPPORTED_API_VERSION > v2 [#240](https://github.com/RedHatQE/openshift-python-wrapper/pull/240)
@@ -158,14 +169,4 @@
 ---
 
 ## v1.5.27 (01/09/2021)
-*No changelog for this release.*
-
----
-
-## v1.5.26 (01/09/2021)
-*No changelog for this release.*
-
----
-
-## v1.5.25 (01/09/2021)
 *No changelog for this release.*
