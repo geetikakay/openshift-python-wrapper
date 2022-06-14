@@ -1,10 +1,9 @@
 import contextlib
 import json
-import logging
 import os
 import re
 import sys
-from distutils.version import Version
+from io import StringIO
 from signal import SIGINT, signal
 
 import kubernetes
@@ -18,12 +17,19 @@ from openshift.dynamic.exceptions import (
     ServerTimeoutError,
 )
 from openshift.dynamic.resource import ResourceField
+from packaging.version import Version
 
 from ocp_resources.constants import (
     NOT_FOUND_ERROR_EXCEPTION_DICT,
     PROTOCOL_ERROR_EXCEPTION_DICT,
+    TIMEOUT_4MINUTES,
 )
-from ocp_resources.utils import TimeoutExpiredError, TimeoutSampler
+from ocp_resources.logger import get_logger
+from ocp_resources.utils import (
+    TimeoutExpiredError,
+    TimeoutSampler,
+    skip_existing_resource_creation_teardown,
+)
 
 
 DEFAULT_CLUSTER_RETRY_EXCEPTIONS = {
@@ -36,8 +42,7 @@ DEFAULT_CLUSTER_RETRY_EXCEPTIONS = {
     ServerTimeoutError: [],
 }
 
-LOGGER = logging.getLogger(__name__)
-TIMEOUT = 240
+LOGGER = get_logger(name=__name__)
 MAX_SUPPORTED_API_VERSION = "v2"
 
 
@@ -163,7 +168,7 @@ class KubeAPIVersion(Version):
     def __init__(self, vstring=None):
         self.vstring = vstring
         self.version = None
-        super().__init__(vstring=vstring)
+        super().__init__(version=vstring)
 
     def parse(self, vstring):
         components = [comp for comp in self.component_re.split(vstring) if comp]
@@ -252,6 +257,7 @@ class Resource:
         CREATED = "Created"
         RECONCILE_COMPLETE = "ReconcileComplete"
         READY = "Ready"
+        FAILING = "Failing"
 
         class Status:
             TRUE = "True"
@@ -278,14 +284,17 @@ class Resource:
         APIREGISTRATION_K8S_IO = "apiregistration.k8s.io"
         APP_KUBERNETES_IO = "app.kubernetes.io"
         APPS = "apps"
+        BATCH = "batch"
         CDI_KUBEVIRT_IO = "cdi.kubevirt.io"
         CONFIG_OPENSHIFT_IO = "config.openshift.io"
         CONSOLE_OPENSHIFT_IO = "console.openshift.io"
         EVENTS_K8S_IO = "events.k8s.io"
         FORKLIFT_KONVEYOR_IO = "forklift.konveyor.io"
+        FLAVOR_KUBEVIRT_IO = "flavor.kubevirt.io"
         HCO_KUBEVIRT_IO = "hco.kubevirt.io"
         HOSTPATHPROVISIONER_KUBEVIRT_IO = "hostpathprovisioner.kubevirt.io"
         IMAGE_OPENSHIFT_IO = "image.openshift.io"
+        IMAGE_REGISTRY = "registry.redhat.io"
         K8S_CNI_CNCF_IO = "k8s.cni.cncf.io"
         K8S_V1_CNI_CNCF_IO = "k8s.v1.cni.cncf.io"
         KUBERNETES_IO = "kubernetes.io"
@@ -295,12 +304,14 @@ class Resource:
         MACHINE_OPENSHIFT_IO = "machine.openshift.io"
         MACHINECONFIGURATION_OPENSHIFT_IO = "machineconfiguration.openshift.io"
         MAISTRA_IO = "maistra.io"
+        MIGRATIONS_KUBEVIRT_IO = "migrations.kubevirt.io"
         MONITORING_COREOS_COM = "monitoring.coreos.com"
         NETWORKADDONSOPERATOR_NETWORK_KUBEVIRT_IO = (
             "networkaddonsoperator.network.kubevirt.io"
         )
         NETWORKING_ISTIO_IO = "networking.istio.io"
         NETWORKING_K8S_IO = "networking.k8s.io"
+        NODE_LABELLER_KUBEVIRT_IO = "node-labeller.kubevirt.io"
         NMSTATE_IO = "nmstate.io"
         NODEMAINTENANCE_KUBEVIRT_IO = "nodemaintenance.kubevirt.io"
         OPERATOR_OPENSHIFT_IO = "operator.openshift.io"
@@ -309,6 +320,7 @@ class Resource:
         OS_TEMPLATE_KUBEVIRT_IO = "os.template.kubevirt.io"
         PACKAGES_OPERATORS_COREOS_COM = "packages.operators.coreos.com"
         POLICY = "policy"
+        POOL_KUBEVIRT_IO = "pool.kubevirt.io"
         PROJECT_OPENSHIFT_IO = "project.openshift.io"
         RBAC_AUTHORIZATION_K8S_IO = "rbac.authorization.k8s.io"
         RIPSAW_CLOUDBULLDOZER_IO = "ripsaw.cloudbulldozer.io"
@@ -322,6 +334,8 @@ class Resource:
         SSP_KUBEVIRT_IO = "ssp.kubevirt.io"
         STORAGE_K8S_IO = "storage.k8s.io"
         STORAGECLASS_KUBERNETES_IO = "storageclass.kubernetes.io"
+        SUBRESOURCES_KUBEVIRT_IO = "subresources.kubevirt.io"
+        TEKTON_TASKS_KUBEVIRT_IO = "tektontasks.kubevirt.io"
         TEMPLATE_KUBEVIRT_IO = "template.kubevirt.io"
         TEMPLATE_OPENSHIFT_IO = "template.openshift.io"
         UPLOAD_CDI_KUBEVIRT_IO = "upload.cdi.kubevirt.io"
@@ -339,9 +353,13 @@ class Resource:
         name=None,
         client=None,
         teardown=True,
-        timeout=TIMEOUT,
+        timeout=TIMEOUT_4MINUTES,
         privileged_client=None,
         yaml_file=None,
+        delete_timeout=TIMEOUT_4MINUTES,
+        dry_run=None,
+        node_selector=None,
+        node_selector_labels=None,
     ):
         """
         Create a API resource
@@ -382,6 +400,18 @@ class Resource:
 
         self.teardown = teardown
         self.timeout = timeout
+        self.delete_timeout = delete_timeout
+        self.dry_run = dry_run
+        self.node_selector = node_selector
+        self.node_selector_labels = node_selector_labels
+        self.node_selector_spec = self._prepare_node_selector_spec()
+        self.res = None
+
+    def _prepare_node_selector_spec(self):
+        if self.node_selector:
+            return {f"{self.ApiGroup.KUBERNETES_IO}/hostname": self.node_selector}
+        if self.node_selector_labels:
+            return self.node_selector_labels
 
     @ClassProperty
     def kind(cls):  # noqa: N805
@@ -395,10 +425,16 @@ class Resource:
             dict: Resource dict.
         """
         if self.yaml_file:
-            with open(self.yaml_file, "r") as stream:
-                self.resource_dict = yaml.safe_load(stream=stream.read())
-                self.name = self.resource_dict["metadata"]["name"]
-                return self.resource_dict
+            if isinstance(self.yaml_file, StringIO):
+                data = self.yaml_file.read()
+            else:
+                with open(self.yaml_file, "r") as stream:
+                    data = stream.read()
+
+            self.resource_dict = yaml.safe_load(stream=data)
+            self.resource_dict.get("metadata", {}).pop("resourceVersion", None)
+            self.name = self.resource_dict["metadata"]["name"]
+            return self.resource_dict
 
         return {
             "apiVersion": self.api_version,
@@ -414,16 +450,63 @@ class Resource:
 
     def __enter__(self):
         signal(SIGINT, self._sigint_handler)
-        return self.deploy()
+        """
+        For debug, export REUSE_IF_RESOURCE_EXISTS to skip resource create.
+        Spaces are important in the export dict
+
+        Examples:
+            To skip creation of all resources by kind:
+                export REUSE_IF_RESOURCE_EXISTS="{Pod: {}}"
+
+            To skip creation of resource by name (on all namespaces or non-namespaced resources):
+                export REUSE_IF_RESOURCE_EXISTS="{Pod: {<pod-name>:}}"
+
+            To skip creation of resource by name and namespace:
+                export REUSE_IF_RESOURCE_EXISTS="{Pod: {<pod-name>: <pod-namespace>}}"
+
+            To skip creation of multiple resources:
+                export REUSE_IF_RESOURCE_EXISTS="{Namespace: {<namespace-name>:}, Pod: {<pod-name>: <pod-namespace>}}"
+        """
+        _resource = None
+        _export_str = "REUSE_IF_RESOURCE_EXISTS"
+        skip_resource_kind_create_if_exists = os.environ.get(_export_str)
+        if skip_resource_kind_create_if_exists:
+            _resource = skip_existing_resource_creation_teardown(
+                resource=self,
+                export_str=_export_str,
+                user_exported_args=skip_resource_kind_create_if_exists,
+            )
+
+        return _resource or self.deploy()
 
     def __exit__(self, exception_type, exception_value, traceback):
-        # For debug, export kind (class name) + NOTEARDOWN to skip resource teardown.
-        # For example:export VirtualMachineInstanceNOTEARDOWN=True
-        skip_teardown_env = f"{self.kind}NOTEARDOWN"
-        no_teardown_from_environment = os.environ.get(skip_teardown_env)
-        if no_teardown_from_environment:
+        """
+        For debug, export SKIP_RESOURCE_TEARDOWN to skip resource teardown.
+        Spaces are important in the export dict
+
+        Examples:
+            To skip teardown of all resources by kind:
+                export SKIP_RESOURCE_TEARDOWN="{Pod: {}}"
+
+            To skip teardown of resource by name (on all namespaces):
+                export SKIP_RESOURCE_TEARDOWN="{Pod: {<pod-name>:}}"
+
+            To skip teardown of resource by name and namespace:
+                export SKIP_RESOURCE_TEARDOWN="{Pod: {<pod-name>: <pod-namespace>}}"
+
+            To skip teardown of multiple resources:
+                export SKIP_RESOURCE_TEARDOWN="{Namespace: {<namespace-name>:}, Pod: {<pod-name>: <pod-namespace>}}"
+        """
+        _export_str = "SKIP_RESOURCE_TEARDOWN"
+        skip_resource_teardown = os.environ.get(_export_str)
+        if skip_resource_teardown and skip_existing_resource_creation_teardown(
+            resource=self,
+            export_str=_export_str,
+            user_exported_args=skip_resource_teardown,
+            check_exists=False,
+        ):
             LOGGER.warning(
-                f"Skip teardown. Got {skip_teardown_env}={no_teardown_from_environment}"
+                f"Skip resource {self.kind} {self.name} teardown. Got {_export_str}={skip_resource_teardown}"
             )
             return
 
@@ -434,8 +517,8 @@ class Resource:
         self.__exit__(exception_type=None, exception_value=None, traceback=None)
         sys.exit(signal_received)
 
-    def deploy(self):
-        self.create()
+    def deploy(self, wait=False):
+        self.create(wait=wait)
         return self
 
     def clean_up(self):
@@ -443,11 +526,11 @@ class Resource:
             try:
                 _collect_data(resource_object=self)
             except Exception as exception_:
-                LOGGER.warning(exception_)
+                LOGGER.warning(
+                    f"Log collector failed to collect info for {self.kind} {self.name}\nexception: {exception_}"
+                )
 
-        data = self.to_dict()
-        LOGGER.info(f"Deleting {data}")
-        self.delete(wait=True, timeout=self.timeout)
+        self.delete(wait=True, timeout=self.delete_timeout)
 
     @classmethod
     def _prepare_resources(cls, dyn_client, singular_name, *args, **kwargs):
@@ -497,7 +580,7 @@ class Resource:
     def api(self):
         return self.full_api()
 
-    def wait(self, timeout=TIMEOUT, sleep=1):
+    def wait(self, timeout=TIMEOUT_4MINUTES, sleep=1):
         """
         Wait for resource
 
@@ -522,7 +605,7 @@ class Resource:
             if sample:
                 return
 
-    def wait_deleted(self, timeout=TIMEOUT):
+    def wait_deleted(self, timeout=TIMEOUT_4MINUTES):
         """
         Wait until resource is deleted
 
@@ -562,7 +645,9 @@ class Resource:
             if not sample:
                 return
 
-    def wait_for_status(self, status, timeout=TIMEOUT, stop_status=None, sleep=1):
+    def wait_for_status(
+        self, status, timeout=TIMEOUT_4MINUTES, stop_status=None, sleep=1
+    ):
         """
         Wait for resource to be in status
 
@@ -632,20 +717,26 @@ class Resource:
 
             data.update(body)
 
-        LOGGER.info(f"Posting {data}")
         LOGGER.info(f"Create {self.kind} {self.name}")
-        res = self.api.create(body=data, namespace=self.namespace)
+        LOGGER.info(f"Posting {data}")
+        LOGGER.debug(f"\n{yaml.dump(data)}")
+        res = self.api.create(body=data, namespace=self.namespace, dry_run=self.dry_run)
         if wait and res:
             return self.wait()
         return res
 
-    def delete(self, wait=False, timeout=TIMEOUT, body=None):
+    def delete(self, wait=False, timeout=TIMEOUT_4MINUTES, body=None):
+        LOGGER.info(f"Delete {self.kind} {self.name}")
+        if self.exists:
+            data = self.instance.to_dict()
+            LOGGER.info(f"Deleting {data}")
+            LOGGER.debug(f"\n{yaml.dump(data)}")
+
         try:
             res = self.api.delete(name=self.name, namespace=self.namespace, body=body)
         except NotFoundError:
             return False
 
-        LOGGER.info(f"Delete {self.kind} {self.name}")
         if wait and res:
             return self.wait_deleted(timeout=timeout)
         return res
@@ -670,7 +761,8 @@ class Resource:
         Args:
             resource_dict: Resource dictionary
         """
-        LOGGER.info(f"Update {self.kind} {self.name}: {resource_dict}")
+        LOGGER.info(f"Update {self.kind} {self.name}:\n{resource_dict}")
+        LOGGER.debug(f"\n{yaml.dump(resource_dict)}")
         self.api.patch(
             body=resource_dict,
             namespace=self.namespace,
@@ -682,7 +774,8 @@ class Resource:
         Replace resource metadata.
         Use this to remove existing field. (update() will only update existing fields)
         """
-        LOGGER.info(f"Replace {self.kind} {self.name}: {resource_dict}")
+        LOGGER.info(f"Replace {self.kind} {self.name}: \n{resource_dict}")
+        LOGGER.debug(f"\n{yaml.dump(resource_dict)}")
         self.api.replace(body=resource_dict, name=self.name, namespace=self.namespace)
 
     @staticmethod
@@ -831,9 +924,11 @@ class NamespacedResource(Resource):
         namespace=None,
         client=None,
         teardown=True,
-        timeout=TIMEOUT,
+        timeout=TIMEOUT_4MINUTES,
         privileged_client=None,
         yaml_file=None,
+        delete_timeout=TIMEOUT_4MINUTES,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -842,6 +937,8 @@ class NamespacedResource(Resource):
             timeout=timeout,
             privileged_client=privileged_client,
             yaml_file=yaml_file,
+            delete_timeout=delete_timeout,
+            **kwargs,
         )
         self.namespace = namespace
         if not (self.name and self.namespace) and not self.yaml_file:

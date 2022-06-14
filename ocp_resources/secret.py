@@ -1,3 +1,4 @@
+from ocp_resources.constants import TIMEOUT_4MINUTES
 from ocp_resources.resource import NamespacedResource
 
 
@@ -20,6 +21,9 @@ class Secret(NamespacedResource):
         data_dict=None,
         string_data=None,
         yaml_file=None,
+        delete_timeout=TIMEOUT_4MINUTES,
+        type=None,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -27,12 +31,15 @@ class Secret(NamespacedResource):
             client=client,
             teardown=teardown,
             yaml_file=yaml_file,
+            delete_timeout=delete_timeout,
+            **kwargs,
         )
         self.accesskeyid = accesskeyid
         self.secretkey = secretkey
         self.htpasswd = htpasswd
         self.data_dict = data_dict
         self.string_data = string_data
+        self.type = type
 
     def to_dict(self):
         res = super().to_dict()
@@ -49,6 +56,8 @@ class Secret(NamespacedResource):
             res.update({"data": self.data_dict})
         if self.string_data:
             res.update({"stringData": self.string_data})
+        if self.type:
+            res.update({"type": self.type})
 
         return res
 

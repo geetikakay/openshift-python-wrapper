@@ -1,17 +1,17 @@
-import logging
 import shlex
 
 import xmltodict
 from openshift.dynamic.exceptions import ResourceNotFoundError
 
-from ocp_resources.constants import PROTOCOL_ERROR_EXCEPTION_DICT
+from ocp_resources.constants import PROTOCOL_ERROR_EXCEPTION_DICT, TIMEOUT_4MINUTES
+from ocp_resources.logger import get_logger
 from ocp_resources.node import Node
 from ocp_resources.pod import Pod
-from ocp_resources.resource import TIMEOUT, NamespacedResource
+from ocp_resources.resource import NamespacedResource
 from ocp_resources.utils import TimeoutExpiredError, TimeoutSampler
 
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = get_logger(name=__name__)
 
 
 class VirtualMachineInstance(NamespacedResource):
@@ -31,6 +31,8 @@ class VirtualMachineInstance(NamespacedResource):
         client=None,
         privileged_client=None,
         yaml_file=None,
+        delete_timeout=TIMEOUT_4MINUTES,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -38,6 +40,8 @@ class VirtualMachineInstance(NamespacedResource):
             client=client,
             privileged_client=privileged_client,
             yaml_file=yaml_file,
+            delete_timeout=delete_timeout,
+            **kwargs,
         )
 
     @property
@@ -53,12 +57,12 @@ class VirtualMachineInstance(NamespacedResource):
             method=method, action=action, url=self._subresource_api_url, **params
         )
 
-    def pause(self, timeout=TIMEOUT, wait=False):
+    def pause(self, timeout=TIMEOUT_4MINUTES, wait=False):
         self.api_request(method="PUT", action="pause")
         if wait:
             return self.wait_for_pause_status(pause=True, timeout=timeout)
 
-    def unpause(self, timeout=TIMEOUT, wait=False):
+    def unpause(self, timeout=TIMEOUT_4MINUTES, wait=False):
         self.api_request(method="PUT", action="unpause")
         if wait:
             return self.wait_for_pause_status(pause=False, timeout=timeout)
@@ -102,7 +106,7 @@ class VirtualMachineInstance(NamespacedResource):
 
         raise ResourceNotFoundError
 
-    def wait_until_running(self, timeout=TIMEOUT, logs=True, stop_status=None):
+    def wait_until_running(self, timeout=TIMEOUT_4MINUTES, logs=True, stop_status=None):
         """
         Wait until VMI is running
 
@@ -129,7 +133,7 @@ class VirtualMachineInstance(NamespacedResource):
 
             raise
 
-    def wait_for_pause_status(self, pause, timeout=TIMEOUT):
+    def wait_for_pause_status(self, pause, timeout=TIMEOUT_4MINUTES):
         """
         Wait for Virtual Machine Instance to be paused / unpaused.
         Paused status is checked in libvirt and in the VMI conditions.
@@ -148,7 +152,7 @@ class VirtualMachineInstance(NamespacedResource):
         self.wait_for_domstate_pause_status(pause=pause, timeout=timeout)
         self.wait_for_vmi_condition_pause_status(pause=pause, timeout=timeout)
 
-    def wait_for_domstate_pause_status(self, pause, timeout=TIMEOUT):
+    def wait_for_domstate_pause_status(self, pause, timeout=TIMEOUT_4MINUTES):
         pause_status = "paused" if pause else "running"
         samples = TimeoutSampler(
             wait_timeout=timeout,
@@ -160,7 +164,7 @@ class VirtualMachineInstance(NamespacedResource):
             if pause_status in sample:
                 return
 
-    def wait_for_vmi_condition_pause_status(self, pause, timeout=TIMEOUT):
+    def wait_for_vmi_condition_pause_status(self, pause, timeout=TIMEOUT_4MINUTES):
         samples = TimeoutSampler(
             wait_timeout=timeout,
             sleep=1,
@@ -197,7 +201,7 @@ class VirtualMachineInstance(NamespacedResource):
             name=self.instance.status.nodeName,
         )
 
-    def _virsh_cmd(self, action):
+    def virsh_cmd(self, action):
         return shlex.split(
             f"virsh {self.virt_launcher_pod_hypervisor_connection_uri} {action} {self.namespace}_{self.name}"
         )
@@ -210,7 +214,7 @@ class VirtualMachineInstance(NamespacedResource):
             xml_output(string): VMI XML in the multi-line string
         """
         return self.virt_launcher_pod.execute(
-            command=self._virsh_cmd(action="dumpxml"),
+            command=self.virsh_cmd(action="dumpxml"),
             container="compute",
         )
 
@@ -262,7 +266,20 @@ class VirtualMachineInstance(NamespacedResource):
             String: VMI Status as string
         """
         return self.virt_launcher_pod.execute(
-            command=self._virsh_cmd(action="domstate"),
+            command=self.virsh_cmd(action="domstate"),
+            container="compute",
+        )
+
+    def get_dommemstat(self):
+        """
+        Get virtual machine domain memory stats
+        link: https://libvirt.org/manpages/virsh.html#dommemstat
+
+        Returns:
+            String: VMI domain memory stats as string
+        """
+        return self.virt_launcher_pod.execute(
+            command=self.virsh_cmd(action="dommemstat"),
             container="compute",
         )
 

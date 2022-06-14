@@ -1,3 +1,4 @@
+from ocp_resources.constants import TIMEOUT_4MINUTES
 from ocp_resources.mtv import MTV
 from ocp_resources.resource import NamespacedResource
 
@@ -17,9 +18,12 @@ class Provider(NamespacedResource, MTV):
         url=None,
         secret_name=None,
         secret_namespace=None,
+        vddk_init_image=None,
         client=None,
         teardown=True,
         yaml_file=None,
+        delete_timeout=TIMEOUT_4MINUTES,
+        **kwargs,
     ):
         super().__init__(
             name=name,
@@ -27,12 +31,15 @@ class Provider(NamespacedResource, MTV):
             client=client,
             teardown=teardown,
             yaml_file=yaml_file,
+            delete_timeout=delete_timeout,
+            **kwargs,
         )
         self.provider_type = provider_type
         self.url = url
         self.secret_name = secret_name
         self.secret_namespace = secret_namespace
         self.condition_message_ready = self.ConditionMessage.PROVIDER_READY
+        self.vddk_init_image = vddk_init_image
 
     def to_dict(self):
         res = super().to_dict()
@@ -48,6 +55,7 @@ class Provider(NamespacedResource, MTV):
                         "name": self.secret_name,
                         "namespace": self.secret_namespace,
                     },
+                    "settings": {"vddkInitImage": self.vddk_init_image},
                 }
             }
         )
