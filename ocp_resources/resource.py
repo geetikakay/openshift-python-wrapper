@@ -288,6 +288,7 @@ class Resource:
         CDI_KUBEVIRT_IO = "cdi.kubevirt.io"
         CONFIG_OPENSHIFT_IO = "config.openshift.io"
         CONSOLE_OPENSHIFT_IO = "console.openshift.io"
+        DATA_IMPORT_CRON_TEMPLATE_KUBEVIRT_IO = "dataimportcrontemplate.kubevirt.io"
         EVENTS_K8S_IO = "events.k8s.io"
         FORKLIFT_KONVEYOR_IO = "forklift.konveyor.io"
         FLAVOR_KUBEVIRT_IO = "flavor.kubevirt.io"
@@ -335,7 +336,7 @@ class Resource:
         STORAGE_K8S_IO = "storage.k8s.io"
         STORAGECLASS_KUBERNETES_IO = "storageclass.kubernetes.io"
         SUBRESOURCES_KUBEVIRT_IO = "subresources.kubevirt.io"
-        TEKTON_TASKS_KUBEVIRT_IO = "tektontasks.kubevirt.io"
+        TEKTONTASKS_KUBEVIRT_IO = "tektontasks.kubevirt.io"
         TEMPLATE_KUBEVIRT_IO = "template.kubevirt.io"
         TEMPLATE_OPENSHIFT_IO = "template.openshift.io"
         UPLOAD_CDI_KUBEVIRT_IO = "upload.cdi.kubevirt.io"
@@ -406,6 +407,7 @@ class Resource:
         self.node_selector_labels = node_selector_labels
         self.node_selector_spec = self._prepare_node_selector_spec()
         self.res = None
+        self.yaml_file_contents = None
 
     def _prepare_node_selector_spec(self):
         if self.node_selector:
@@ -425,22 +427,24 @@ class Resource:
             dict: Resource dict.
         """
         if self.yaml_file:
-            if isinstance(self.yaml_file, StringIO):
-                data = self.yaml_file.read()
-            else:
-                with open(self.yaml_file, "r") as stream:
-                    data = stream.read()
+            if not self.yaml_file_contents:
+                if isinstance(self.yaml_file, StringIO):
+                    self.yaml_file_contents = self.yaml_file.read()
+                else:
+                    with open(self.yaml_file, "r") as stream:
+                        self.yaml_file_contents = stream.read()
 
-            self.resource_dict = yaml.safe_load(stream=data)
+            self.resource_dict = yaml.safe_load(stream=self.yaml_file_contents)
             self.resource_dict.get("metadata", {}).pop("resourceVersion", None)
             self.name = self.resource_dict["metadata"]["name"]
-            return self.resource_dict
+        else:
+            self.resource_dict = {
+                "apiVersion": self.api_version,
+                "kind": self.kind,
+                "metadata": {"name": self.name},
+            }
 
-        return {
-            "apiVersion": self.api_version,
-            "kind": self.kind,
-            "metadata": {"name": self.name},
-        }
+        return self.resource_dict
 
     def to_dict(self):
         """
@@ -450,6 +454,17 @@ class Resource:
 
     def __enter__(self):
         signal(SIGINT, self._sigint_handler)
+        return self.deploy()
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        if self.teardown:
+            self.clean_up()
+
+    def _sigint_handler(self, signal_received, frame):
+        self.__exit__(exception_type=None, exception_value=None, traceback=None)
+        sys.exit(signal_received)
+
+    def deploy(self, wait=False):
         """
         For debug, export REUSE_IF_RESOURCE_EXISTS to skip resource create.
         Spaces are important in the export dict
@@ -477,9 +492,21 @@ class Resource:
                 user_exported_args=skip_resource_kind_create_if_exists,
             )
 
-        return _resource or self.deploy()
+            if _resource:
+                return _resource
 
-    def __exit__(self, exception_type, exception_value, traceback):
+        self.create(wait=wait)
+        return self
+
+    def clean_up(self):
+        if os.environ.get("CNV_TEST_COLLECT_LOGS", "0") == "1":
+            try:
+                _collect_data(resource_object=self)
+            except Exception as exception_:
+                LOGGER.warning(
+                    f"Log collector failed to collect info for {self.kind} {self.name}\nexception: {exception_}"
+                )
+
         """
         For debug, export SKIP_RESOURCE_TEARDOWN to skip resource teardown.
         Spaces are important in the export dict
@@ -509,26 +536,6 @@ class Resource:
                 f"Skip resource {self.kind} {self.name} teardown. Got {_export_str}={skip_resource_teardown}"
             )
             return
-
-        if self.teardown:
-            self.clean_up()
-
-    def _sigint_handler(self, signal_received, frame):
-        self.__exit__(exception_type=None, exception_value=None, traceback=None)
-        sys.exit(signal_received)
-
-    def deploy(self, wait=False):
-        self.create(wait=wait)
-        return self
-
-    def clean_up(self):
-        if os.environ.get("CNV_TEST_COLLECT_LOGS", "0") == "1":
-            try:
-                _collect_data(resource_object=self)
-            except Exception as exception_:
-                LOGGER.warning(
-                    f"Log collector failed to collect info for {self.kind} {self.name}\nexception: {exception_}"
-                )
 
         self.delete(wait=True, timeout=self.delete_timeout)
 
