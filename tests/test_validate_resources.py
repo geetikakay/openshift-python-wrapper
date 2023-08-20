@@ -4,14 +4,18 @@
 import ast
 import json
 import os
-import re
 
 import pytest
 import requests
 
+from ocp_resources.resource import Resource  # noqa
+
 
 def _api_group_name(api_value):
-    return re.sub("_", ".", api_value.lower())
+    try:
+        return eval(f"Resource.ApiGroup.{api_value}")
+    except AttributeError:
+        return api_value
 
 
 def _api_group_dict(resource_dict, api_group_name):
@@ -47,7 +51,9 @@ def _process_api_type(api_type, api_value, resource_dict, cls):
 def _get_api_group_and_version(bodies):
     for targets in bodies:
         api_type = targets.targets[0].id
-        return api_type, targets.value.attr
+        return api_type, getattr(
+            targets.value, "attr", getattr(targets.value, "s", None)
+        )
 
 
 def _get_namespaced(cls, resource_dict, api_value):

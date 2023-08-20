@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 
+from kubernetes.dynamic.exceptions import ResourceNotFoundError
 
 from ocp_resources.constants import PROTOCOL_ERROR_EXCEPTION_DICT, TIMEOUT_4MINUTES
-from ocp_resources.logger import get_logger
 from ocp_resources.resource import NamespacedResource
 from ocp_resources.utils import TimeoutSampler
 from ocp_resources.virtual_machine import VirtualMachine
-
-
-LOGGER = get_logger(name=__name__)
 
 
 class VirtualMachineRestore(NamespacedResource):
@@ -43,18 +40,15 @@ class VirtualMachineRestore(NamespacedResource):
         self.snapshot_name = snapshot_name
 
     def to_dict(self):
-        res = super().to_dict()
-        if self.yaml_file:
-            return res
-
-        spec = res.setdefault("spec", {})
-        spec.setdefault("target", {})[
-            "apiGroup"
-        ] = NamespacedResource.ApiGroup.KUBEVIRT_IO
-        spec["target"]["kind"] = VirtualMachine.kind
-        spec["target"]["name"] = self.vm_name
-        spec["virtualMachineSnapshotName"] = self.snapshot_name
-        return res
+        super().to_dict()
+        if not self.yaml_file:
+            spec = self.res.setdefault("spec", {})
+            spec.setdefault("target", {})[
+                "apiGroup"
+            ] = NamespacedResource.ApiGroup.KUBEVIRT_IO
+            spec["target"]["kind"] = VirtualMachine.kind
+            spec["target"]["name"] = self.vm_name
+            spec["virtualMachineSnapshotName"] = self.snapshot_name
 
     def wait_complete(self, status=True, timeout=TIMEOUT_4MINUTES):
         """
@@ -67,7 +61,7 @@ class VirtualMachineRestore(NamespacedResource):
         Raises:
             TimeoutExpiredError: If timeout reached.
         """
-        LOGGER.info(
+        self.logger.info(
             f"Wait for {self.kind} {self.name} status to be complete = {status}"
         )
 
@@ -75,9 +69,31 @@ class VirtualMachineRestore(NamespacedResource):
             wait_timeout=timeout,
             sleep=1,
             exceptions_dict=PROTOCOL_ERROR_EXCEPTION_DICT,
-            func=lambda: self.instance.get("status", {}).get("complete", None)
-            == status,
+            func=lambda: self.instance.get("status", {}).get("complete") == status,
         )
         for sample in samples:
             if sample:
                 return
+
+    def wait_restore_done(self, timeout=TIMEOUT_4MINUTES):
+        """
+        Wait for the the restore to be done. This check 2 parameters, the restore status to be complete
+        and the VM status restoreInProgress to be None.
+
+        Args:
+            timeout (int): Time to wait.
+
+        Raises:
+            TimeoutExpiredError: If timeout reached.
+        """
+        self.wait_complete(timeout=timeout)
+
+        vm = VirtualMachine(
+            client=self.client,
+            namespace=self.namespace,
+            name=self.vm_name,
+        )
+
+        if vm.exists:
+            return vm.wait_for_status_none(status="restoreInProgress", timeout=timeout)
+        raise ResourceNotFoundError(f"VirtualMachine: {vm.name} not found")

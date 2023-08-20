@@ -1,8 +1,4 @@
-from ocp_resources.logger import get_logger
 from ocp_resources.utils import TimeoutExpiredError, TimeoutSampler
-
-
-LOGGER = get_logger(name=__name__)
 
 
 def _get_status_condition_log_message(**status_condition):
@@ -60,6 +56,15 @@ class MTV:
         MIGRATION_SUCCEEDED = "The migration has SUCCEEDED."
         HOST_READY = "The host is ready."
 
+    class ConditionCategory:
+        CRITICAL = "Critical"
+
+    class ConditionType:
+        SUCCEEDED = "Succeeded"
+        FAILED = "Failed"
+        TARGET_NAME_NOT_VALID = "TargetNameNotValid"
+        VM_ALREADY_EXISTS = "VMAlreadyExists"
+
     class ProviderType:
         VSPHERE = "vsphere"
         OPENSHIFT = "openshift"
@@ -78,7 +83,7 @@ class MTV:
         Wait for MTV Resource Status Conditions.
         """
 
-        LOGGER.info(
+        self.logger.info(
             _get_status_condition_log_message(
                 condition_status=condition_status,
                 condition_type=condition_type,
@@ -126,7 +131,7 @@ class MTV:
                         return
 
         except TimeoutExpiredError:
-            LOGGER.error(
+            self.logger.error(
                 msg=f"Last Status Condition of {self.kind} {self.name} was: {last_condition}"
             )
             raise

@@ -9,18 +9,14 @@ class Node(Resource):
     api_version = Resource.ApiVersion.V1
 
     class Status(Resource.Status):
-        READY = "Ready"
         SCHEDULING_DISABLED = "Ready,SchedulingDisabled"
 
     @property
     def kubelet_ready(self):
         return any(
-            [
-                stat
-                for stat in self.instance.status.conditions
-                if stat["reason"] == "KubeletReady"
-                and stat["status"] == self.Condition.Status.TRUE
-            ]
+            stat["reason"] == "KubeletReady"
+            and stat["status"] == self.Condition.Status.TRUE
+            for stat in self.instance.status.conditions
         )
 
     @property

@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from ocp_resources.constants import TIMEOUT_4MINUTES
-from ocp_resources.logger import get_logger
 from ocp_resources.resource import NamespacedResource
-
-
-LOGGER = get_logger(name=__name__)
 
 
 class PersistentVolumeClaim(NamespacedResource):
@@ -48,6 +44,7 @@ class PersistentVolumeClaim(NamespacedResource):
         teardown=True,
         yaml_file=None,
         delete_timeout=TIMEOUT_4MINUTES,
+        pvlabel=None,
         **kwargs,
     ):
         super().__init__(
@@ -64,35 +61,37 @@ class PersistentVolumeClaim(NamespacedResource):
         self.size = size
         self.hostpath_node = hostpath_node
         self.storage_class = storage_class
+        self.pvlabel = pvlabel
 
     def to_dict(self):
-        res = super().to_dict()
-        if self.yaml_file:
-            return res
-
-        res.update(
-            {
-                "spec": {
-                    "volumeMode": self.volume_mode,
-                    "accessModes": [self.accessmodes],
-                    "resources": {"requests": {"storage": self.size}},
+        super().to_dict()
+        if not self.yaml_file:
+            self.res.update(
+                {
+                    "spec": {
+                        "volumeMode": self.volume_mode,
+                        "accessModes": [self.accessmodes],
+                        "resources": {"requests": {"storage": self.size}},
+                    }
                 }
-            }
-        )
-        """
-        Hostpath-provisioner is "node aware", when using it,
-        a node attribute on the claim must be introduced as follows.
-        annotations:
-          kubevirt.io/provisionOnNode: <specified_node_name>
-        """
-        if self.hostpath_node:
-            res["metadata"]["annotations"] = {
-                "kubevirt.io/provisionOnNode": self.hostpath_node
-            }
-        if self.storage_class:
-            res["spec"]["storageClassName"] = self.storage_class
+            )
+            """
+            Hostpath-provisioner is "node aware", when using it,
+            a node attribute on the claim must be introduced as follows.
+            annotations:
+              kubevirt.io/provisionOnNode: <specified_node_name>
+            """
+            if self.hostpath_node:
+                self.res["metadata"]["annotations"] = {
+                    "kubevirt.io/provisionOnNode": self.hostpath_node
+                }
+            if self.storage_class:
+                self.res["spec"]["storageClassName"] = self.storage_class
 
-        return res
+            if self.pvlabel:
+                self.res["spec"]["selector"] = {
+                    "matchLabels": {"pvLabel": self.pvlabel}
+                }
 
     def bound(self):
         """
@@ -101,7 +100,7 @@ class PersistentVolumeClaim(NamespacedResource):
         Returns:
             bool: True if bound else False
         """
-        LOGGER.info(f"Check if {self.kind} {self.name} is bound")
+        self.logger.info(f"Check if {self.kind} {self.name} is bound")
         return self.status == self.Status.BOUND
 
     @property

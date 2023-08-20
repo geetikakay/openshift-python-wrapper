@@ -1,9 +1,7 @@
 import time
 
 import yaml
-
-from ocp_resources.logger import get_logger
-
+from simple_logger.logger import get_logger
 
 LOGGER = get_logger(name=__name__)
 
@@ -21,8 +19,8 @@ class TimeoutSampler:
     """
     Samples the function output.
 
-    This is a generator object that at first yields the output of function
-    `func`. After the yield, it either raises instance of `TimeoutExpiredError` or
+    This is a generator object that at first yields the output of callable.
+    After the yield, it either raises instance of `TimeoutExpiredError` or
     sleeps `sleep` seconds.
 
     Yielding the output allows you to handle every value as you wish.
@@ -62,7 +60,7 @@ class TimeoutSampler:
     Args:
         wait_timeout (int): Time in seconds to wait for func to return a value equating to True
         sleep (int): Time in seconds between calls to func
-        func (function): to be wrapped by TimeoutSampler
+        func (Callable): to be wrapped by TimeoutSampler
         exceptions_dict (dict): Exception handling definition
         print_log (bool): Print elapsed time to log
     """
@@ -248,9 +246,9 @@ def skip_existing_resource_creation_teardown(
             LOGGER.warning(_msg)
             return _resource
 
-    resource_to_dict = resource.to_dict()
-    resource_name = resource_to_dict["metadata"]["name"]
-    resource_namespace = resource_to_dict["metadata"].get("namespace")
+    resource.to_dict()
+    resource_name = resource.res["metadata"]["name"]
+    resource_namespace = resource.res["metadata"].get("namespace")
     skip_create_warn_msg = (
         f"Skip resource {resource.kind} {resource_name} creation, using existing one."
         f" Got {export_str}={user_exported_args}"

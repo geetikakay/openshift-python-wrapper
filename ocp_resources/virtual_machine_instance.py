@@ -1,17 +1,13 @@
 import shlex
 
 import xmltodict
-from openshift.dynamic.exceptions import ResourceNotFoundError
+from kubernetes.dynamic.exceptions import ResourceNotFoundError
 
 from ocp_resources.constants import PROTOCOL_ERROR_EXCEPTION_DICT, TIMEOUT_4MINUTES
-from ocp_resources.logger import get_logger
 from ocp_resources.node import Node
 from ocp_resources.pod import Pod
 from ocp_resources.resource import NamespacedResource
 from ocp_resources.utils import TimeoutExpiredError, TimeoutSampler
-
-
-LOGGER = get_logger(name=__name__)
 
 
 class VirtualMachineInstance(NamespacedResource):
@@ -119,17 +115,23 @@ class VirtualMachineInstance(NamespacedResource):
             TimeoutExpiredError: If VMI failed to run.
         """
         try:
+            self.logger.info(
+                f"VMI {self.name} status before wait: {self.instance.status.phase}"
+            )
             self.wait_for_status(
                 status=self.Status.RUNNING, timeout=timeout, stop_status=stop_status
             )
         except TimeoutExpiredError:
             if not logs:
                 raise
-
+            self.logger.error(f"VMI {self.name} status: {self.instance.status.phase}")
             virt_pod = self.virt_launcher_pod
             if virt_pod:
-                LOGGER.debug(f"{virt_pod.name} *****LOGS*****")
-                LOGGER.debug(virt_pod.log(container="compute"))
+                self.logger.error(
+                    f"Status of virt-launcher pod {virt_pod.name}: {virt_pod.status}"
+                )
+                self.logger.debug(f"{virt_pod.name} *****LOGS*****")
+                self.logger.debug(virt_pod.log(container="compute"))
 
             raise
 
@@ -145,7 +147,7 @@ class VirtualMachineInstance(NamespacedResource):
         Raises:
             TimeoutExpiredError: If resource not exists.
         """
-        LOGGER.info(
+        self.logger.info(
             f"Wait until {self.kind} {self.name} is "
             f"{'Paused' if pause else 'Unpuased'}"
         )
@@ -213,10 +215,7 @@ class VirtualMachineInstance(NamespacedResource):
         Returns:
             xml_output(string): VMI XML in the multi-line string
         """
-        return self.virt_launcher_pod.execute(
-            command=self.virsh_cmd(action="dumpxml"),
-            container="compute",
-        )
+        return self.execute_virsh_command(command="dumpxml")
 
     @property
     def virt_launcher_pod_user_uid(self):
@@ -249,11 +248,22 @@ class VirtualMachineInstance(NamespacedResource):
         Returns:
             String: Hypervisor Connection URI
         """
-        return (
-            ""
-            if self.is_virt_launcher_pod_root
-            else "-c qemu+unix:///session?socket=/var/run/libvirt/libvirt-sock"
-        )
+        if self.is_virt_launcher_pod_root:
+            hypervisor_connection_uri = ""
+        else:
+            virtqemud_socket = "virtqemud"
+            socket = (
+                virtqemud_socket
+                if virtqemud_socket
+                in self.virt_launcher_pod.execute(
+                    command=["ls", "/var/run/libvirt/"], container="compute"
+                )
+                else "libvirt"
+            )
+            hypervisor_connection_uri = (
+                f"-c qemu+unix:///session?socket=/var/run/libvirt/{socket}-sock"
+            )
+        return hypervisor_connection_uri
 
     def get_domstate(self):
         """
@@ -265,10 +275,7 @@ class VirtualMachineInstance(NamespacedResource):
         Returns:
             String: VMI Status as string
         """
-        return self.virt_launcher_pod.execute(
-            command=self.virsh_cmd(action="domstate"),
-            container="compute",
-        )
+        return self.execute_virsh_command(command="domstate")
 
     def get_dommemstat(self):
         """
@@ -278,10 +285,7 @@ class VirtualMachineInstance(NamespacedResource):
         Returns:
             String: VMI domain memory stats as string
         """
-        return self.virt_launcher_pod.execute(
-            command=self.virsh_cmd(action="dommemstat"),
-            container="compute",
-        )
+        return self.execute_virsh_command(command="dommemstat")
 
     def get_vmi_active_condition(self):
         """A VMI may have multiple conditions; the active one it the one with
@@ -315,7 +319,7 @@ class VirtualMachineInstance(NamespacedResource):
     def os_version(self):
         vmi_os_version = self.instance.status.guestOSInfo.get("version", {})
         if not vmi_os_version:
-            LOGGER.warning(
+            self.logger.warning(
                 "Guest agent is not installed on the VM; OS version is not available."
             )
         return vmi_os_version
@@ -327,3 +331,9 @@ class VirtualMachineInstance(NamespacedResource):
             if iface["interfaceName"] == interface
         ]
         return iface_ip[0] if iface_ip else None
+
+    def execute_virsh_command(self, command):
+        return self.virt_launcher_pod.execute(
+            command=self.virsh_cmd(action=command),
+            container="compute",
+        )
